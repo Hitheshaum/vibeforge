@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  control:
+    build:
+      context: .
+      dockerfile: ./services/control/Dockerfile
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./services/control/src:/app/src:ro
+      - ./work:/work
+      - ./data:/data
+    environment:
+      - NODE_ENV=development
+      - PORT=4000
+      - CONTROL_PLANE_ACCOUNT_ID=${CONTROL_PLANE_ACCOUNT_ID}
+      - ROLE_NAME=${ROLE_NAME:-VibeDeployerRole}
+      - DEFAULT_REGION=${DEFAULT_REGION:-us-east-1}
+      - BEDROCK_REGION=${BEDROCK_REGION:-us-east-1}
+      - BEDROCK_MODEL_ID=${BEDROCK_MODEL_ID:-anthropic.claude-3-5-sonnet-20241022-v2:0}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    command: npm run dev
+    restart: unless-stopped
+
+  ui:
+    build:
+      context: .
+      dockerfile: ./services/ui/Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./services/ui/src:/app/src:ro
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_BASE=http://localhost:4000
+    command: npm run dev
+    restart: unless-stopped
+    depends_on:
+      - control
+
+volumes:
+  work:
+  data:

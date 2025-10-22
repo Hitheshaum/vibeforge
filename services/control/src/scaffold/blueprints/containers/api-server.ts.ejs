@@ -1,0 +1,104 @@
+import express from 'express';
+import cors from 'cors';
+import { Pool } from 'pg';
+
+const app = express();
+const port = process.env.PORT || 3000;
+
+// Database connection
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: parseInt(process.env.DB_PORT || '5432'),
+  database: process.env.DB_NAME,
+  user: process.env.DB_USERNAME,
+  password: process.env.DB_PASSWORD,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+});
+
+app.use(cors());
+app.use(express.json());
+
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Root
+app.get('/', (req, res) => {
+  res.json({
+    name: '<%= appName %>',
+    version: '1.0.0',
+    environment: process.env.NODE_ENV,
+  });
+});
+
+<% spec.api.forEach(function(endpoint) { %>
+// <%= endpoint.method %> <%= endpoint.path %>
+app.<%= endpoint.method.toLowerCase() %>('<%= endpoint.path %>', async (req, res) => {
+  try {
+    <% if (endpoint.method === 'GET') { %>
+    // List or retrieve items
+    const result = await pool.query('SELECT * FROM items LIMIT 100');
+    res.json({
+      message: 'Success',
+      items: result.rows,
+    });
+    <% } else if (endpoint.method === 'POST') { %>
+    // Create item
+    const { name, description } = req.body;
+    const result = await pool.query(
+      'INSERT INTO items (name, description, created_at) VALUES ($1, $2, NOW()) RETURNING *',
+      [name, description]
+    );
+    res.status(201).json({
+      message: 'Created',
+      item: result.rows[0],
+    });
+    <% } else if (endpoint.method === 'PUT') { %>
+    // Update item
+    const { id } = req.params;
+    const { name, description } = req.body;
+    const result = await pool.query(
+      'UPDATE items SET name = $1, description = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
+      [name, description, id]
+    );
+    res.json({
+      message: 'Updated',
+      item: result.rows[0],
+    });
+    <% } else if (endpoint.method === 'DELETE') { %>
+    // Delete item
+    const { id } = req.params;
+    await pool.query('DELETE FROM items WHERE id = $1', [id]);
+    res.json({ message: 'Deleted' });
+    <% } else { %>
+    // Handler for <%= endpoint.handler %>
+    res.json({
+      message: 'Handler for <%= endpoint.handler %>',
+      method: '<%= endpoint.method %>',
+      path: '<%= endpoint.path %>',
+    });
+    <% } %>
+  } catch (error: any) {
+    console.error('Error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message,
+    });
+  }
+});
+<% }); %>
+
+// Error handling
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error(err.stack);
+  res.status(500).json({
+    error: 'Something went wrong!',
+    message: err.message,
+  });
+});
+
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+  console.log(`Environment: ${process.env.NODE_ENV}`);
+});

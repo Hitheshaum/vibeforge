@@ -1,0 +1,41 @@
+#!/usr/bin/env node
+import 'source-map-support/register';
+import * as cdk from 'aws-cdk-lib';
+import { AppStack } from '../lib/app-stack';
+
+const app = new cdk.App();
+
+const appId = '<%= appId %>';
+const appName = '<%= appName %>';
+
+// Dev Stack
+new AppStack(app, `${appName}-Dev`, {
+  appId,
+  appName,
+  environment: 'dev',
+  env: {
+    account: '<%= accountId %>',
+    region: '<%= region %>',
+  },
+  tags: {
+    AppId: appId,
+    Env: 'dev',
+    ManagedBy: 'aws-vibe',
+  },
+});
+
+// Prod Stack
+new AppStack(app, `${appName}-Prod`, {
+  appId,
+  appName,
+  environment: 'prod',
+  env: {
+    account: '<%= accountId %>',
+    region: '<%= region %>',
+  },
+  tags: {
+    AppId: appId,
+    Env: 'prod',
+    ManagedBy: 'aws-vibe',
+  },
+});

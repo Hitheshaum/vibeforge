@@ -1,0 +1,18 @@
+{
+  "name": "@aws-vibe/shared",
+  "version": "1.0.0",
+  "description": "Shared types and utilities for VibeForge platform",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "keywords": ["aws", "types"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3"
+  }
+}

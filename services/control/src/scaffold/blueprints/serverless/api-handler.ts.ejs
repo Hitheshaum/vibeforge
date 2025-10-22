@@ -1,0 +1,145 @@
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, ScanCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
+
+const client = new DynamoDBClient({});
+const docClient = DynamoDBDocumentClient.from(client);
+
+/**
+ * Lambda handler: <%= endpoint.handler %>
+ * <%= endpoint.method %> <%= endpoint.path %>
+ * <% if (endpoint.description) { %><%= endpoint.description %><% } %>
+ */
+export async function handler(
+  event: APIGatewayProxyEvent
+): Promise<APIGatewayProxyResult> {
+  console.log('Event:', JSON.stringify(event, null, 2));
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+    'Access-Control-Allow-Methods': '<%= endpoint.method %>',
+  };
+
+  try {
+    <% if (endpoint.method === 'GET') { %>
+    // GET request - list or retrieve items
+    const result = await docClient.send(
+      new ScanCommand({
+        TableName: process.env.TABLE_NAME, // Update with appropriate table
+      })
+    );
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        message: 'Success',
+        items: result.Items || [],
+      }),
+    };
+    <% } else if (endpoint.method === 'POST') { %>
+    // POST request - create item
+    const body = JSON.parse(event.body || '{}');
+
+    await docClient.send(
+      new PutCommand({
+        TableName: process.env.TABLE_NAME, // Update with appropriate table
+        Item: {
+          id: Date.now().toString(),
+          ...body,
+          createdAt: new Date().toISOString(),
+        },
+      })
+    );
+
+    return {
+      statusCode: 201,
+      headers,
+      body: JSON.stringify({
+        message: 'Created successfully',
+      }),
+    };
+    <% } else if (endpoint.method === 'PUT') { %>
+    // PUT request - update item
+    const body = JSON.parse(event.body || '{}');
+    const id = event.pathParameters?.id;
+
+    if (!id) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'ID required' }),
+      };
+    }
+
+    await docClient.send(
+      new PutCommand({
+        TableName: process.env.TABLE_NAME, // Update with appropriate table
+        Item: {
+          id,
+          ...body,
+          updatedAt: new Date().toISOString(),
+        },
+      })
+    );
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        message: 'Updated successfully',
+      }),
+    };
+    <% } else if (endpoint.method === 'DELETE') { %>
+    // DELETE request - delete item
+    const id = event.pathParameters?.id;
+
+    if (!id) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'ID required' }),
+      };
+    }
+
+    await docClient.send(
+      new DeleteCommand({
+        TableName: process.env.TABLE_NAME, // Update with appropriate table
+        Key: { id },
+      })
+    );
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        message: 'Deleted successfully',
+      }),
+    };
+    <% } else { %>
+    // Default handler
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        message: 'Handler for <%= endpoint.handler %>',
+        method: '<%= endpoint.method %>',
+        path: '<%= endpoint.path %>',
+      }),
+    };
+    <% } %>
+  } catch (error: any) {
+    console.error('Error:', error);
+
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({
+        error: 'Internal server error',
+        message: error.message,
+      }),
+    };
+  }
+}

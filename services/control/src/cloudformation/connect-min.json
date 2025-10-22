@@ -1,0 +1,346 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "VibeForge cross-account deployer role with permissions boundary",
+  "Parameters": {
+    "ControlPlaneAccountId": {
+      "Type": "String",
+      "Description": "AWS Account ID of the control plane",
+      "AllowedPattern": "^[0-9]{12}$"
+    },
+    "ExternalId": {
+      "Type": "String",
+      "Description": "External ID for secure cross-account access",
+      "MinLength": 8
+    },
+    "RoleName": {
+      "Type": "String",
+      "Description": "Name of the IAM role to create",
+      "Default": "VibeDeployerRole"
+    }
+  },
+  "Resources": {
+    "VibePermissionsBoundary": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties": {
+        "ManagedPolicyName": "VibePermissionsBoundary",
+        "Description": "Permissions boundary for VibeForge deployed resources",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "AllowCloudFormation",
+              "Effect": "Allow",
+              "Action": [
+                "cloudformation:*"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowS3",
+              "Effect": "Allow",
+              "Action": [
+                "s3:*"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowCloudFront",
+              "Effect": "Allow",
+              "Action": [
+                "cloudfront:*"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowAPIGateway",
+              "Effect": "Allow",
+              "Action": [
+                "apigateway:*"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowLambda",
+              "Effect": "Allow",
+              "Action": [
+                "lambda:*"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowDynamoDB",
+              "Effect": "Allow",
+              "Action": [
+                "dynamodb:*"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowCognito",
+              "Effect": "Allow",
+              "Action": [
+                "cognito-idp:*"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowLogs",
+              "Effect": "Allow",
+              "Action": [
+                "logs:*"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowKMS",
+              "Effect": "Allow",
+              "Action": [
+                "kms:*"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowSSM",
+              "Effect": "Allow",
+              "Action": [
+                "ssm:*"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowSecretsManager",
+              "Effect": "Allow",
+              "Action": [
+                "secretsmanager:*"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowRoute53",
+              "Effect": "Allow",
+              "Action": [
+                "route53:*"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowACM",
+              "Effect": "Allow",
+              "Action": [
+                "acm:*"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowECS",
+              "Effect": "Allow",
+              "Action": [
+                "ecs:*",
+                "ecr:*"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowEC2",
+              "Effect": "Allow",
+              "Action": [
+                "ec2:*"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowELB",
+              "Effect": "Allow",
+              "Action": [
+                "elasticloadbalancing:*"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowRDS",
+              "Effect": "Allow",
+              "Action": [
+                "rds:*"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowIAMRoles",
+              "Effect": "Allow",
+              "Action": [
+                "iam:CreateRole",
+                "iam:DeleteRole",
+                "iam:GetRole",
+                "iam:PassRole",
+                "iam:AttachRolePolicy",
+                "iam:DetachRolePolicy",
+                "iam:PutRolePolicy",
+                "iam:DeleteRolePolicy",
+                "iam:GetRolePolicy",
+                "iam:TagRole",
+                "iam:UntagRole",
+                "iam:ListRoleTags",
+                "iam:UpdateRole",
+                "iam:UpdateRoleDescription",
+                "iam:UpdateAssumeRolePolicy",
+                "iam:CreateServiceLinkedRole"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowIAMPolicies",
+              "Effect": "Allow",
+              "Action": [
+                "iam:CreatePolicy",
+                "iam:DeletePolicy",
+                "iam:GetPolicy",
+                "iam:GetPolicyVersion",
+                "iam:ListPolicyVersions"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowBedrock",
+              "Effect": "Allow",
+              "Action": [
+                "bedrock:InvokeModel",
+                "bedrock:InvokeModelWithResponseStream",
+                "bedrock:ListFoundationModels",
+                "bedrock:GetFoundationModel"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowSTSGetCallerIdentity",
+              "Effect": "Allow",
+              "Action": [
+                "sts:GetCallerIdentity"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowCloudWatch",
+              "Effect": "Allow",
+              "Action": [
+                "cloudwatch:*",
+                "events:*"
+              ],
+              "Resource": "*"
+            }
+          ]
+        }
+      }
+    },
+    "VibeDeployerRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": {
+          "Ref": "RoleName"
+        },
+        "Description": "Cross-account role for VibeForge deployments",
+        "PermissionsBoundary": {
+          "Ref": "VibePermissionsBoundary"
+        },
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Sub": "arn:aws:iam::${ControlPlaneAccountId}:root"
+                }
+              },
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "sts:ExternalId": {
+                    "Ref": "ExternalId"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          {
+            "Ref": "VibePermissionsBoundary"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "ManagedBy",
+            "Value": "vibeforge"
+          }
+        ]
+      }
+    },
+    "VibeArtifactBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": {
+          "Fn::Sub": "vibe-artifacts-${AWS::AccountId}-${AWS::Region}"
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "DeleteOldVersions",
+              "Status": "Enabled",
+              "NoncurrentVersionExpirationInDays": 30
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "ManagedBy",
+            "Value": "vibeforge"
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "RoleArn": {
+      "Description": "ARN of the created IAM role",
+      "Value": {
+        "Fn::GetAtt": ["VibeDeployerRole", "Arn"]
+      }
+    },
+    "PermissionsBoundaryArn": {
+      "Description": "ARN of the permissions boundary policy",
+      "Value": {
+        "Ref": "VibePermissionsBoundary"
+      }
+    },
+    "ArtifactBucket": {
+      "Description": "S3 bucket for CDK artifacts",
+      "Value": {
+        "Ref": "VibeArtifactBucket"
+      }
+    },
+    "ArtifactBucketArn": {
+      "Description": "ARN of the artifacts bucket",
+      "Value": {
+        "Fn::GetAtt": ["VibeArtifactBucket", "Arn"]
+      }
+    }
+  }
+}

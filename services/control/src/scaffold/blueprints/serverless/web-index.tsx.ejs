@@ -1,0 +1,71 @@
+import React from 'react';
+
+export default function Home() {
+  return (
+    <div style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif', maxWidth: '1200px', margin: '0 auto' }}>
+      <h1 style={{ color: '#0070f3', fontSize: '2.5rem', marginBottom: '1rem' }}><%= displayName %></h1>
+      <p style={{ fontSize: '1.1rem', color: '#666' }}>Welcome to your generated application!</p>
+
+      <div style={{ marginTop: '3rem' }}>
+        <h2 style={{ color: '#333', fontSize: '1.5rem', marginBottom: '1rem', borderBottom: '2px solid #0070f3', paddingBottom: '0.5rem' }}>Pages</h2>
+        <ul style={{ listStyle: 'none', paddingLeft: '1rem' }}>
+          <% spec.pages.forEach(function(page) { %>
+          <li style={{ margin: '1rem 0' }}>
+            <strong style={{ color: '#0070f3' }}><%= page.route %></strong>
+            <% if (page.title) { %> - <%= page.title %><% } %>
+            <ul style={{ listStyle: 'disc', paddingLeft: '2rem', marginTop: '0.5rem' }}>
+              <% page.components.forEach(function(component) { %>
+              <li style={{ margin: '0.25rem 0', color: '#666' }}><%= component %></li>
+              <% }); %>
+            </ul>
+          </li>
+          <% }); %>
+        </ul>
+      </div>
+
+      <div style={{ marginTop: '3rem' }}>
+        <h2 style={{ color: '#333', fontSize: '1.5rem', marginBottom: '1rem', borderBottom: '2px solid #0070f3', paddingBottom: '0.5rem' }}>API Endpoints</h2>
+        <ul style={{ listStyle: 'none', paddingLeft: '1rem' }}>
+          <% spec.api.forEach(function(endpoint) { %>
+          <li style={{ margin: '1rem 0' }}>
+            <span style={{
+              display: 'inline-block',
+              padding: '0.25rem 0.5rem',
+              background: '<%= endpoint.method === "GET" ? "#10b981" : endpoint.method === "POST" ? "#3b82f6" : endpoint.method === "PUT" ? "#f59e0b" : "#ef4444" %>',
+              color: 'white',
+              borderRadius: '4px',
+              fontSize: '0.875rem',
+              fontWeight: 'bold',
+              marginRight: '0.5rem'
+            }}><%= endpoint.method %></span>
+            <code style={{ background: '#f3f4f6', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>{'<%= endpoint.path %>'}</code>
+            <% if (endpoint.description) { %>
+            <p style={{ marginTop: '0.5rem', color: '#666', paddingLeft: '1rem' }}><%= endpoint.description %></p>
+            <% } %>
+          </li>
+          <% }); %>
+        </ul>
+      </div>
+
+      <div style={{ marginTop: '3rem' }}>
+        <h2 style={{ color: '#333', fontSize: '1.5rem', marginBottom: '1rem', borderBottom: '2px solid #0070f3', paddingBottom: '0.5rem' }}>Data Models</h2>
+        <ul style={{ listStyle: 'none', paddingLeft: '1rem' }}>
+          <% spec.dataModel.forEach(function(model) { %>
+          <li style={{ margin: '1.5rem 0', padding: '1rem', background: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+            <strong style={{ color: '#0070f3', fontSize: '1.1rem' }}><%= model.table %></strong>
+            <ul style={{ listStyle: 'none', paddingLeft: '1rem', marginTop: '0.75rem' }}>
+              <li style={{ margin: '0.5rem 0' }}><strong>Partition Key:</strong> <code style={{ background: '#fff', padding: '0.25rem 0.5rem', borderRadius: '4px' }}><%= model.partitionKey %></code></li>
+              <% if (model.sortKey) { %><li style={{ margin: '0.5rem 0' }}><strong>Sort Key:</strong> <code style={{ background: '#fff', padding: '0.25rem 0.5rem', borderRadius: '4px' }}><%= model.sortKey %></code></li><% } %>
+              <li style={{ margin: '0.5rem 0' }}><strong>Attributes:</strong> <%= model.attributes.map(a => a.name).join(', ') %></li>
+            </ul>
+          </li>
+          <% }); %>
+        </ul>
+      </div>
+
+      <footer style={{ marginTop: '4rem', padding: '2rem 0', borderTop: '1px solid #e5e7eb', textAlign: 'center', color: '#666' }}>
+        <p>Generated with VibeForge</p>
+      </footer>
+    </div>
+  );
+}
