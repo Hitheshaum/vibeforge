@@ -1,4 +1,4 @@
-# AWS Vibe - Quick Start Guide
+# VibeForge - Quick Start Guide
 
 Get your first app deployed in **under 10 minutes**!
 
@@ -7,19 +7,23 @@ Get your first app deployed in **under 10 minutes**!
 - Docker & Docker Compose installed
 - AWS Account with billing enabled
 - AWS Account ID (12 digits)
+- AWS credentials (access key ID and secret access key)
 
 ## Step 1: Configure Environment (1 minute)
 
 ```bash
-cd aws-vibe-starter
+cd vibeforge
 
-# The .env file is already created, just update your Account ID
+# Copy the example and edit it
+cp .env.example .env
 nano .env
 ```
 
-**Change this line:**
+**Update these lines:**
 ```bash
 CONTROL_PLANE_ACCOUNT_ID=123456789012  # ← Replace with YOUR account ID
+AWS_ACCESS_KEY_ID=your-access-key      # ← Your AWS access key
+AWS_SECRET_ACCESS_KEY=your-secret-key  # ← Your AWS secret key
 ```
 
 **Optional:** Change Bedrock region if needed (must be Bedrock-supported):
@@ -46,35 +50,35 @@ control_1  | [API] Control service listening on port 4000
 ui_1       | ready - started server on 0.0.0.0:3000
 ```
 
-## Step 3: Connect AWS Account (3 minutes)
+## Step 3: Verify AWS Connection (1 minute)
 
 1. **Open browser**: http://localhost:3000
 
-2. **Click**: "Open Quick-Create in AWS Console"
+2. **Check connection status**: You should see "✓ Connected to AWS" at the top
 
-3. **In AWS Console**:
-   - Review the CloudFormation template
-   - Check the boxes to acknowledge IAM resource creation
-   - Click **"Create stack"**
-   - Wait ~2 minutes for stack to complete
+   The control service automatically:
+   - Creates a CloudFormation stack with IAM role (`VibeDeployerStack`)
+   - Sets up permissions boundary
+   - Verifies the connection
 
-4. **Back in UI**:
-   - Enter your **AWS Account ID** (12 digits)
-   - Click **"Verify Connection"**
-   - You should see ✓ Connected
+3. **If not connected**, check logs:
+   ```bash
+   docker compose logs control
+   ```
 
-## Step 4: Enable Bedrock Model Access (2 minutes)
+## Step 4: Bedrock Model Access (Optional)
 
-**First time only:**
+**By default**, VibeForge uses `amazon.titan-text-express-v1` which is immediately available without approval.
 
-1. Go to: https://console.aws.amazon.com/bedrock/
-2. Click **"Model access"** in left sidebar
-3. Click **"Manage model access"** (orange button)
-4. Find and enable: **"Claude 3.5 Sonnet"**
-5. Click **"Save changes"**
-6. Wait for status to change to "Access granted" (~30 seconds)
+**For better quality** with Claude models:
 
-**Note:** You only need to do this once per account/region.
+1. If you see an access denied error, go to: https://console.aws.amazon.com/bedrock/
+2. Navigate to **Model catalog**
+3. Find **"Claude 3.5 Sonnet"**
+4. Click **"Try in playground"** to complete first-time setup
+5. Submit use case details if prompted (usually instant approval)
+
+**Note:** AWS now automatically enables most models. You only need this step if using Anthropic Claude models for the first time.
 
 ## Step 5: Generate Your First App (3 minutes)
 
@@ -92,9 +96,11 @@ Back in the UI (http://localhost:3000):
 
 4. **Click**: "Generate & Preview"
 
-5. **Wait** ~3-5 minutes while:
-   - Bedrock generates the spec
+5. **Wait** ~3-7 minutes while:
+   - Bedrock generates the app specification
+   - Bedrock generates functional React components
    - CDK deploys infrastructure
+   - Web app is built and uploaded
    - CloudFront distribution is created
 
 6. **Success!** You'll see a **Preview URL** like:
