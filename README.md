@@ -1,12 +1,13 @@
-# AWS Vibe Starter
+# VibeForge
 
-> A self-hosted, open-source platform for Base44-style "vibe coding" that deploys full-stack applications to your AWS account using **Amazon Bedrock** for AI-powered spec generation and **AWS CDK** for infrastructure deployment.
+> A self-hosted, open-source vibe coding app that deploys fully functional full-stack applications to your AWS account using **Amazon Bedrock** for AI-powered code generation and **AWS CDK** for infrastructure deployment.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 🚀 Features
 
 - **Real AWS Integration**: Uses Amazon Bedrock (Claude) for AI-powered app generation—no mocks
+- **Functional Code Generation**: Bedrock generates working React components with hooks, API calls, and forms—not just specs
 - **Auto-Connected Setup**: Automatic IAM role provisioning on startup—no manual CloudFormation steps
 - **Two Deployment Environments**: Separate dev and prod stacks with isolated resources
 - **Two Blueprints**:
@@ -30,8 +31,8 @@
 ### 1. Clone and Configure
 
 ```bash
-git clone https://github.com/yourusername/aws-vibe-starter.git
-cd aws-vibe-starter
+git clone https://github.com/Hitheshaum/vibeforge.git
+cd vibeforge
 
 # Copy environment template
 cp .env.example .env
@@ -104,9 +105,10 @@ docker compose logs control | grep "Connected to AWS"
 
 The platform will:
 - Call Amazon Bedrock to generate an app specification
-- Render a complete repository with CDK infrastructure
+- Call Amazon Bedrock again to generate functional React component code
+- Render a complete repository with CDK infrastructure and working UI
 - Deploy the dev stack to your AWS account
-- Return a CloudFront preview URL
+- Return a CloudFront preview URL with your functional app
 
 ### 4. Publish to Production
 
@@ -307,7 +309,7 @@ BEDROCK_MODEL_ID=anthropic.claude-3-haiku-20240307-v1:0     # Faster, cheaper
 ## 📂 Repository Structure
 
 ```
-aws-vibe-starter/
+vibeforge/
 ├── docker-compose.yml          # Service orchestration
 ├── Makefile                    # Convenience commands
 ├── .env.example                # Environment template
@@ -492,8 +494,9 @@ my-app/
 1. **User submits prompt** → UI sends to control service
 2. **Control service**:
    - Assumes role in target account
-   - Calls Bedrock to generate spec (JSON)
-   - Renders templates with EJS
+   - Calls Bedrock to generate app spec (JSON)
+   - Calls Bedrock to generate functional React components (TypeScript/TSX)
+   - Writes generated code and templates to repository
    - Initializes git repo
 3. **CDK deployment**:
    - Bootstraps CDK (if needed)
@@ -517,14 +520,13 @@ Contributions welcome! Please:
 
 ## 🙏 Acknowledgments
 
-- Inspired by [Base44](https://base44.com/) vibe coding
 - Powered by [Amazon Bedrock](https://aws.amazon.com/bedrock/)
 - Built with [AWS CDK](https://aws.amazon.com/cdk/)
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/aws-vibe-starter/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/aws-vibe-starter/discussions)
+- **Issues**: [GitHub Issues](https://github.com/Hitheshaum/vibeforge/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/Hitheshaum/vibeforge/discussions)
 
 ## 🗺️ Roadmap
 
