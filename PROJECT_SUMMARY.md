@@ -1,8 +1,8 @@
-# AWS Vibe Starter - Project Summary
+# VibeForge - Project Summary
 
 ## ✅ Complete Production-Ready Repository
 
-This repository is a **fully functional, production-ready** open-source platform that integrates with real AWS services to enable Base44-style "vibe coding" with infrastructure deployment.
+This repository is a **fully functional, production-ready** open-source vibe coding platform that integrates with real AWS services to generate and deploy fully functional full-stack applications with AI-powered code generation.
 
 ## 📦 What Was Created
 
