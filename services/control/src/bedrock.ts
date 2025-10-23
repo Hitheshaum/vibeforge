@@ -149,7 +149,7 @@ You must output ONLY valid JSON in the following exact schema:
   ],
   "api": [
     {
-      "path": "/api/todos",
+      "path": "/todos",
       "method": "GET",
       "handler": "listTodos",
       "description": "List all todos",
@@ -188,7 +188,8 @@ Rules:
 4. For containers: use PostgreSQL models, Express routes, containerized services
 5. Include only necessary endpoints and data models
 6. Set auth:true only if authentication is explicitly required
-7. Be concise but complete`;
+7. API paths should start with / (e.g., /todos, /users) without /api prefix
+8. Be concise but complete`;
 }
 
 /**
