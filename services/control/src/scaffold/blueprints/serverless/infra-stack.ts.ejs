@@ -178,11 +178,6 @@ export class AppStack extends cdk.Stack {
         throttlingRateLimit: 100,
         throttlingBurstLimit: 200,
       },
-      defaultCorsPreflightOptions: {
-        allowOrigins: apigateway.Cors.ALL_ORIGINS,
-        allowMethods: apigateway.Cors.ALL_METHODS,
-        allowHeaders: ['Content-Type', 'Authorization'],
-      },
     });
 
     <% if (auth) { %>
@@ -192,15 +187,32 @@ export class AppStack extends cdk.Stack {
     });
     <% } %>
 
+    // Track created resources to add CORS preflight
+    const createdResources = new Set<string>();
+
     <% spec.api.forEach(function(endpoint) { %>
     // API Route: <%= endpoint.method %> <%= endpoint.path %>
     {
       const parts = '<%= endpoint.path %>'.split('/').filter(p => p);
       let resource: apigateway.IResource = api.root;
+      let resourcePath = '';
+
       for (const part of parts) {
+        resourcePath += '/' + part;
         const existing = resource.getResource(part);
         resource = existing || resource.addResource(part);
+
+        // Add CORS preflight to each resource (only once)
+        if (!createdResources.has(resourcePath)) {
+          resource.addCorsPreflight({
+            allowOrigins: ['*'],
+            allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+            allowHeaders: ['Content-Type', 'Authorization'],
+          });
+          createdResources.add(resourcePath);
+        }
       }
+
       resource.addMethod('<%= endpoint.method %>', new apigateway.LambdaIntegration(<%= endpoint.handler %>Fn)<% if (auth && endpoint.requiresAuth) { %>, {
         authorizer,
         authorizationType: apigateway.AuthorizationType.COGNITO,
