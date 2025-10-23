@@ -141,35 +141,36 @@ export async function deployCdkStack(
       console.log(`[Deploy] Dependencies unchanged, using cached node_modules`);
     }
 
-    // Bootstrap CDK first (required before synth)
-    if (onStatus) onStatus('deploy-bootstrap', 'Bootstrapping AWS CDK (first time only)');
-    await bootstrapCdk(infraPath, cdkEnv);
-
-    // Run web build and CDK synth in parallel (independent operations)
-    if (onStatus) onStatus('deploy-build', 'Building web app and synthesizing CDK');
-    console.log(`[Deploy] Running web build and CDK synth in parallel`);
-
-    const [buildResult, synthResult] = await Promise.all([
-      execCommand('npm', ['run', 'build'], {
-        cwd: webPath,
-        env: {
-          NODE_ENV: 'production',
-          // No NEXT_PUBLIC_API_URL - will be loaded from config.json at runtime
-        },
-        timeout: 300000 // 5 minutes
-      }),
-      execCdk(['synth', stackName], { cwd: infraPath, env: cdkEnv })
-    ]);
+    // Build web app (CDK synth needs web/out to exist)
+    if (onStatus) onStatus('deploy-web-build', 'Building web application');
+    console.log(`[Deploy] Building web app in ${webPath}`);
+    const buildResult = await execCommand('npm', ['run', 'build'], {
+      cwd: webPath,
+      env: {
+        NODE_ENV: 'production',
+        // No NEXT_PUBLIC_API_URL - will be loaded from config.json at runtime
+      },
+      timeout: 300000 // 5 minutes
+    });
 
     if (buildResult.exitCode !== 0) {
       throw new Error(`Web build failed: ${buildResult.stderr}`);
     }
 
+    // Bootstrap CDK and synth in parallel (now that web/out exists)
+    if (onStatus) onStatus('deploy-bootstrap', 'Bootstrapping CDK and synthesizing stack');
+    console.log(`[Deploy] Running CDK bootstrap and synth in parallel`);
+
+    const [_, synthResult] = await Promise.all([
+      bootstrapCdk(infraPath, cdkEnv),
+      execCdk(['synth', stackName], { cwd: infraPath, env: cdkEnv })
+    ]);
+
     if (synthResult.exitCode !== 0) {
       throw new Error(`CDK synth failed: ${synthResult.stderr}`);
     }
 
-    console.log(`[Deploy] Build and synth completed`);
+    console.log(`[Deploy] Bootstrap and synth completed`);
 
     // Deploy infrastructure
     if (onStatus) onStatus('deploy-cdk', 'Deploying infrastructure with CloudFormation');
