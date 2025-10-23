@@ -157,20 +157,18 @@ export async function deployCdkStack(
       throw new Error(`Web build failed: ${buildResult.stderr}`);
     }
 
-    // Bootstrap CDK and synth in parallel (now that web/out exists)
-    if (onStatus) onStatus('deploy-bootstrap', 'Bootstrapping CDK and synthesizing stack');
-    console.log(`[Deploy] Running CDK bootstrap and synth in parallel`);
+    // Bootstrap CDK (after dependencies are installed)
+    if (onStatus) onStatus('deploy-bootstrap', 'Bootstrapping AWS CDK (first time only)');
+    await bootstrapCdk(infraPath, cdkEnv);
 
-    const [_, synthResult] = await Promise.all([
-      bootstrapCdk(infraPath, cdkEnv),
-      execCdk(['synth', stackName], { cwd: infraPath, env: cdkEnv })
-    ]);
+    // Synth (must be after bootstrap, both use same cdk.out directory)
+    if (onStatus) onStatus('deploy-synth', 'Synthesizing CloudFormation template');
+    console.log(`[Deploy] Synthesizing CDK stack`);
+    const synthResult = await execCdk(['synth', stackName], { cwd: infraPath, env: cdkEnv });
 
     if (synthResult.exitCode !== 0) {
       throw new Error(`CDK synth failed: ${synthResult.stderr}`);
     }
-
-    console.log(`[Deploy] Bootstrap and synth completed`);
 
     // Deploy infrastructure
     if (onStatus) onStatus('deploy-cdk', 'Deploying infrastructure with CloudFormation');
