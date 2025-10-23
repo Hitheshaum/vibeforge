@@ -26,40 +26,49 @@ export class AppStack extends cdk.Stack {
     // S3 Bucket for web hosting
     const webBucket = new s3.Bucket(this, 'WebBucket', {
       bucketName: `${appName.toLowerCase()}-${environment}-web-${this.account}`,
-      publicReadAccess: false,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      // Dev: use public S3 website hosting (fast, no CloudFront)
+      // Prod: use CloudFront with OAC (secure, cached)
+      publicReadAccess: environment === 'dev',
+      blockPublicAccess: environment === 'dev'
+        ? s3.BlockPublicAccess.BLOCK_ACLS
+        : s3.BlockPublicAccess.BLOCK_ALL,
+      websiteIndexDocument: environment === 'dev' ? 'index.html' : undefined,
+      websiteErrorDocument: environment === 'dev' ? 'index.html' : undefined,
       removalPolicy: environment === 'dev' ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
       autoDeleteObjects: environment === 'dev',
     });
 
-    // CloudFront Distribution with OAC
-    const distribution = new cloudfront.Distribution(this, 'Distribution', {
-      defaultBehavior: {
-        origin: origins.S3BucketOrigin.withOriginAccessControl(webBucket),
-        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-        cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
-      },
-      defaultRootObject: 'index.html',
-      errorResponses: [
-        {
-          httpStatus: 404,
-          responseHttpStatus: 200,
-          responsePagePath: '/index.html',
+    // CloudFront Distribution - ONLY for production (dev uses S3 website)
+    let distribution: cloudfront.Distribution | undefined;
+    if (environment === 'prod') {
+      distribution = new cloudfront.Distribution(this, 'Distribution', {
+        defaultBehavior: {
+          origin: origins.S3BucketOrigin.withOriginAccessControl(webBucket),
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
         },
-        {
-          httpStatus: 403,
-          responseHttpStatus: 200,
-          responsePagePath: '/index.html',
-        },
-      ],
-    });
+        defaultRootObject: 'index.html',
+        errorResponses: [
+          {
+            httpStatus: 404,
+            responseHttpStatus: 200,
+            responsePagePath: '/index.html',
+          },
+          {
+            httpStatus: 403,
+            responseHttpStatus: 200,
+            responsePagePath: '/index.html',
+          },
+        ],
+      });
+    }
 
     // Deploy web assets to S3
     new s3deploy.BucketDeployment(this, 'WebDeployment', {
       sources: [s3deploy.Source.asset(path.join(__dirname, '../../web/out'))],
       destinationBucket: webBucket,
-      distribution,
-      distributionPaths: ['/*'],
+      distribution, // undefined for dev, CloudFront for prod
+      distributionPaths: distribution ? ['/*'] : undefined,
     });
 
     <% if (auth) { %>
@@ -226,20 +235,30 @@ export class AppStack extends cdk.Stack {
       description: 'S3 bucket for web hosting',
     });
 
-    new cdk.CfnOutput(this, 'DistributionId', {
-      value: distribution.distributionId,
-      description: 'CloudFront distribution ID',
-    });
+    if (distribution) {
+      new cdk.CfnOutput(this, 'DistributionId', {
+        value: distribution.distributionId,
+        description: 'CloudFront distribution ID',
+      });
 
-    new cdk.CfnOutput(this, 'DistributionDomain', {
-      value: distribution.distributionDomainName,
-      description: 'CloudFront distribution domain',
-    });
+      new cdk.CfnOutput(this, 'DistributionDomain', {
+        value: distribution.distributionDomainName,
+        description: 'CloudFront distribution domain',
+      });
 
-    new cdk.CfnOutput(this, environment === 'dev' ? 'PreviewUrl' : 'ProdUrl', {
-      value: `https://${distribution.distributionDomainName}`,
-      description: environment === 'dev' ? 'Preview URL' : 'Production URL',
-    });
+      new cdk.CfnOutput(this, 'ProdUrl', {
+        value: `https://${distribution.distributionDomainName}`,
+        description: 'Production URL',
+      });
+    }
+
+    // Dev uses S3 website URL (fast), Prod uses CloudFront (secure + cached)
+    if (environment === 'dev') {
+      new cdk.CfnOutput(this, 'PreviewUrl', {
+        value: webBucket.bucketWebsiteUrl,
+        description: 'Preview URL (S3 website)',
+      });
+    }
 
     new cdk.CfnOutput(this, 'ApiUrl', {
       value: api.url,

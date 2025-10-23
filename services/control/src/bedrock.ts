@@ -482,7 +482,7 @@ Output ONLY valid JSON in this exact format:
     "TodoList": "import React from 'react';\\n\\nexport function TodoList() {\\n  return <div>Todo List</div>;\\n}"
   },
   "lib": {
-    "api": "const baseUrl = (process.env.NEXT_PUBLIC_API_URL || '/api').replace(/\\\\/+$/, '');\\\\nexport async function getTodos() { const res = await fetch(\\`\\${baseUrl}/todos\\`); return res.json(); }",
+    "api": "let apiUrl: string | null = null;\\\\n\\\\nasync function getApiUrl() {\\\\n  if (apiUrl) return apiUrl;\\\\n  try {\\\\n    const res = await fetch('/config.json');\\\\n    const config = await res.json();\\\\n    apiUrl = config.apiUrl.replace(/\\\\/+$/, '');\\\\n  } catch {\\\\n    apiUrl = (process.env.NEXT_PUBLIC_API_URL || '/api').replace(/\\\\/+$/, '');\\\\n  }\\\\n  return apiUrl;\\\\n}\\\\n\\\\nexport async function getTodos() {\\\\n  const base = await getApiUrl();\\\\n  const res = await fetch(\\`\\${base}/todos\\`);\\\\n  return res.json();\\\\n}",
     "types": "export interface Todo { id: string; title: string; }"
   }
 }
@@ -528,7 +528,10 @@ Generate:
 
 2. **lib/api.ts**: Create an API utility file that:
    - Imports types from './types'
-   - CRITICAL: Strip trailing slashes from base URL: const baseUrl = (process.env.NEXT_PUBLIC_API_URL || '/api').replace(/\/+$/, '');
+   - CRITICAL: Load API URL from runtime config, NOT environment variables
+   - First, try to fetch /config.json to get runtime API URL
+   - Fallback to process.env.NEXT_PUBLIC_API_URL if config.json fails
+   - Strip trailing slashes from base URL: baseUrl.replace(/\/+$/, '')
    - Exports helper functions for each API endpoint
    - Construct URLs properly without double slashes: \`\${baseUrl}/path\` NOT \`\${baseUrl}\${path}\`
    - Handles fetch requests with proper error handling
