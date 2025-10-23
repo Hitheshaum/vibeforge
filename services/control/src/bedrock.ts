@@ -506,52 +506,30 @@ CRITICAL Requirements:
 }
 
 function buildComponentUserPrompt(spec: AppSpec): string {
+  const pages = spec.pages.map(p => `- ${p.route}: ${p.title || 'Page'} (components: ${p.components.join(', ')})`).join('\n');
+  const endpoints = spec.api.map(e => `- ${e.method} ${e.path}: ${e.description || ''}`).join('\n');
+  const models = spec.dataModel.map(m => `- ${m.table}: ${m.attributes.map(a => `${a.name} (${a.type})`).join(', ')}`).join('\n');
+
   return `Generate fully functional React components for this application:
 
 **App Name:** ${spec.name}
 
 **Pages:**
-${spec.pages.map(p => `- ${p.route}: ${p.title || 'Page'} (components: ${p.components.join(', ')})`).join('\n')}
+${pages}
 
 **API Endpoints:**
-${spec.api.map(e => `- ${e.method} ${e.path}: ${e.description || ''}`).join('\n')}
+${endpoints}
 
 **Data Model:**
-${spec.dataModel.map(m => `- ${m.table}: ${m.attributes.map(a => `${a.name} (${a.type})`).join(', ')}`).join('\n')}
+${models}
 
 Generate:
-1. **lib/types.ts**: FIRST, create a types file that exports ALL TypeScript interfaces for:
-   - Data models (based on the data model above)
-   - API request/response types
-   - Component props
-   - Any other shared types
+1. lib/types.ts - TypeScript interfaces for data models, API types, and component props
+2. lib/api.ts - API utility that loads config from /config.json at runtime and provides typed helper functions
+3. components - Reusable React components with forms, lists, and full interactivity
+4. pages - Next.js page components that fetch data and display it with loading and error states
 
-2. **lib/api.ts**: Create an API utility file that:
-   - Imports types from lib/types
-   - CRITICAL: Load API URL from runtime config, NOT environment variables
-   - First, try to fetch /config.json to get runtime API URL
-   - Fallback to process.env.NEXT_PUBLIC_API_URL if config.json fails
-   - Strip trailing slashes from base URL using regex replace
-   - Exports helper functions for each API endpoint
-   - Construct URLs properly without double slashes
-   - Handles fetch requests with proper error handling
-   - Returns properly typed data
+CRITICAL: Define ALL TypeScript types in lib/types.ts and import them. Load API URL from /config.json at runtime, not from environment variables.
 
-3. **components**: Create reusable components that:
-   - Import types from lib/types
-   - Handle CRUD operations via API calls
-   - Include forms with validation
-   - Show lists with proper formatting
-   - Are fully interactive and self-contained
-
-4. **pages**: Create a functional Next.js page component for each route that:
-   - Imports components and types
-   - Fetches data from the API
-   - Displays loading states
-   - Handles errors gracefully
-   - Has a clean, modern UI with inline styles
-
-IMPORTANT: All TypeScript types MUST be defined in lib/types.ts and imported from there. Never define types inline or in component files.
-
-Make the app beautiful and functional with modern inline styles. Use responsive design principles.`;
+Make the app beautiful with modern inline styles and responsive design.`;
 }
