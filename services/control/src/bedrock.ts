@@ -527,7 +527,7 @@ Generate:
    - Any other shared types
 
 2. **lib/api.ts**: Create an API utility file that:
-   - Imports types from './types'
+   - Imports types from lib/types
    - CRITICAL: Load API URL from runtime config, NOT environment variables
    - First, try to fetch /config.json to get runtime API URL
    - Fallback to process.env.NEXT_PUBLIC_API_URL if config.json fails
@@ -538,7 +538,7 @@ Generate:
    - Returns properly typed data
 
 3. **components**: Create reusable components that:
-   - Import types from '../lib/types'
+   - Import types from lib/types
    - Handle CRUD operations via API calls
    - Include forms with validation
    - Show lists with proper formatting
