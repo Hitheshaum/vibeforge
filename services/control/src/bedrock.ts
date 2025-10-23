@@ -482,7 +482,7 @@ Output ONLY valid JSON in this exact format:
     "TodoList": "import React from 'react';\\n\\nexport function TodoList() {\\n  return <div>Todo List</div>;\\n}"
   },
   "lib": {
-    "api": "let apiUrl: string | null = null;\\\\n\\\\nasync function getApiUrl() {\\\\n  if (apiUrl) return apiUrl;\\\\n  try {\\\\n    const res = await fetch('/config.json');\\\\n    const config = await res.json();\\\\n    apiUrl = config.apiUrl.replace(/\\\\/+$/, '');\\\\n  } catch {\\\\n    apiUrl = (process.env.NEXT_PUBLIC_API_URL || '/api').replace(/\\\\/+$/, '');\\\\n  }\\\\n  return apiUrl;\\\\n}\\\\n\\\\nexport async function getTodos() {\\\\n  const base = await getApiUrl();\\\\n  const res = await fetch(\\`\\${base}/todos\\`);\\\\n  return res.json();\\\\n}",
+    "api": "let apiUrl: string | null = null;\\\\n\\\\nasync function getApiUrl() {\\\\n  if (apiUrl) return apiUrl;\\\\n  try {\\\\n    const res = await fetch('/config.json');\\\\n    const config = await res.json();\\\\n    apiUrl = config.apiUrl.replace(/\\\\\\\\/+$/, '');\\\\n  } catch {\\\\n    apiUrl = (process.env.NEXT_PUBLIC_API_URL || '/api').replace(/\\\\\\\\/+$/, '');\\\\n  }\\\\n  return apiUrl;\\\\n}\\\\n\\\\nexport async function getTodos() {\\\\n  const base = await getApiUrl();\\\\n  const res = await fetch(base + '/todos');\\\\n  return res.json();\\\\n}",
     "types": "export interface Todo { id: string; title: string; }"
   }
 }
