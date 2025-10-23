@@ -15,7 +15,8 @@ export async function deployCdkStack(
   accountId: string,
   region: string,
   environment: Environment,
-  externalId: string
+  externalId: string,
+  onStatus?: (step: string, message: string) => void
 ): Promise<DeploymentResult> {
   const repoPath = path.join(WORK_DIR, appId);
   const infraPath = path.join(repoPath, 'infra');
@@ -49,6 +50,7 @@ export async function deployCdkStack(
     };
 
     // Install dependencies FIRST (required for bootstrap)
+    if (onStatus) onStatus('deploy-install', 'Installing infrastructure dependencies');
     console.log(`[Deploy] Installing dependencies in ${infraPath}`);
     const installResult = await execCommand('npm', ['install'], {
       cwd: infraPath,
@@ -60,8 +62,9 @@ export async function deployCdkStack(
       throw new Error(`npm install failed: ${installResult.stderr}`);
     }
 
-    // Install and build web app
+    // Install web dependencies and do initial build (before we know API URL)
     const webPath = path.join(repoPath, 'web');
+    if (onStatus) onStatus('deploy-web-install', 'Installing web app dependencies');
     console.log(`[Deploy] Installing web dependencies in ${webPath}`);
     const webInstallResult = await execCommand('npm', ['install'], {
       cwd: webPath,
@@ -72,25 +75,33 @@ export async function deployCdkStack(
       throw new Error(`Web npm install failed: ${webInstallResult.stderr}`);
     }
 
-    console.log(`[Deploy] Building web app in ${webPath}`);
-    const webBuildResult = await execCommand('npm', ['run', 'build'], {
+    // Initial build with placeholder API URL (CDK needs web/out to exist)
+    if (onStatus) onStatus('deploy-web-build', 'Building web application (initial)');
+    console.log(`[Deploy] Building web app in ${webPath} (initial build)`);
+    const initialBuildResult = await execCommand('npm', ['run', 'build'], {
       cwd: webPath,
-      env: { NODE_ENV: 'production' },
+      env: {
+        NODE_ENV: 'production',
+        NEXT_PUBLIC_API_URL: '/api' // Placeholder
+      },
       timeout: 300000 // 5 minutes
     });
 
-    if (webBuildResult.exitCode !== 0) {
-      throw new Error(`Web build failed: ${webBuildResult.stderr}`);
+    if (initialBuildResult.exitCode !== 0) {
+      throw new Error(`Initial web build failed: ${initialBuildResult.stderr}`);
     }
 
     // Bootstrap CDK (after dependencies are installed)
+    if (onStatus) onStatus('deploy-bootstrap', 'Bootstrapping AWS CDK (first time only)');
     await bootstrapCdk(infraPath, cdkEnv);
 
     // Synth
+    if (onStatus) onStatus('deploy-synth', 'Synthesizing CloudFormation template');
     console.log(`[Deploy] Synthesizing CDK stack`);
     await execCdk(['synth', stackName], { cwd: infraPath, env: cdkEnv });
 
-    // Deploy
+    // Deploy infrastructure FIRST to get API URL
+    if (onStatus) onStatus('deploy-cdk', 'Deploying infrastructure with CloudFormation (this may take several minutes)');
     console.log(`[Deploy] Deploying CDK stack: ${stackName}`);
     const deployResult = await execCdk(
       ['deploy', stackName, '--require-approval', 'never', '--outputs-file', 'outputs.json'],
@@ -101,10 +112,39 @@ export async function deployCdkStack(
       throw new Error(`CDK deploy failed: ${deployResult.stderr}`);
     }
 
-    // Read outputs
+    // Read outputs to get API URL
     const outputsFile = path.join(infraPath, 'outputs.json');
     const outputsData = await readJson(outputsFile);
     const outputs: StackOutputs = outputsData[stackName] || {};
+    const apiUrl = outputs.ApiUrl || outputs.ApiEndpoint4F160690;
+
+    // Rebuild web app with the REAL API URL
+    if (onStatus) onStatus('deploy-web-rebuild', 'Rebuilding web application with API URL');
+    console.log(`[Deploy] Rebuilding web app with API URL: ${apiUrl}`);
+    const webRebuildResult = await execCommand('npm', ['run', 'build'], {
+      cwd: webPath,
+      env: {
+        NODE_ENV: 'production',
+        NEXT_PUBLIC_API_URL: apiUrl
+      },
+      timeout: 300000 // 5 minutes
+    });
+
+    if (webRebuildResult.exitCode !== 0) {
+      throw new Error(`Web rebuild failed: ${webRebuildResult.stderr}`);
+    }
+
+    // Deploy AGAIN to upload the correctly built web files
+    if (onStatus) onStatus('deploy-web-upload', 'Uploading web application to S3');
+    console.log(`[Deploy] Uploading web files to S3`);
+    const webDeployResult = await execCdk(
+      ['deploy', stackName, '--require-approval', 'never'],
+      { cwd: infraPath, env: cdkEnv, timeout: 300000 } // 5 minutes
+    );
+
+    if (webDeployResult.exitCode !== 0) {
+      throw new Error(`Web upload failed: ${webDeployResult.stderr}`);
+    }
 
     // Get preview/prod URL
     const previewUrl = outputs.PreviewUrl;

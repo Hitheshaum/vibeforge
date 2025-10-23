@@ -27,6 +27,7 @@ import { renderRepo } from './scaffold/renderRepo';
 import { deployCdkStack, destroyCdkStack } from './deploy';
 import { validateRequest, generateRequestSchema, publishRequestSchema, destroyRequestSchema, checkConnectionRequestSchema } from './util/validation';
 import { readJson, writeJson, listDir, exists } from './util/fsx';
+import { statusTracker } from './statusTracker';
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -114,6 +115,20 @@ app.post('/api/check', async (req, res) => {
 });
 
 /**
+ * Get generation status
+ */
+app.get('/api/generate/:jobId/status', (req, res) => {
+  const { jobId } = req.params;
+  const status = statusTracker.getStatus(jobId);
+
+  if (!status) {
+    return res.status(404).json({ error: 'Job not found' });
+  }
+
+  res.json(status);
+});
+
+/**
  * Generate app spec and deploy dev stack
  */
 app.post('/api/generate', async (req, res) => {
@@ -121,77 +136,118 @@ app.post('/api/generate', async (req, res) => {
     const data = validateRequest(generateRequestSchema, req.body);
     const { accountId, region, blueprint, prompt, appName } = data;
 
-    // Sanitize app name for CloudFormation (no spaces, special chars)
-    const sanitizedAppName = appName
-      .replace(/[^a-zA-Z0-9-]/g, '-')  // Replace invalid chars with hyphen
-      .replace(/-+/g, '-')              // Remove consecutive hyphens
-      .replace(/^-|-$/g, '');           // Remove leading/trailing hyphens
+    // Generate job ID
+    const jobId = uuidv4();
 
-    // Get tenant config for external ID
-    const { externalId } = await getTenantConfig();
-    const roleName = process.env.ROLE_NAME || 'VibeDeployerRole';
+    // Create job tracking
+    statusTracker.createJob(jobId);
 
-    // Assume role
-    const credentials = await assumeRole({
-      accountId,
-      region,
-      roleName,
-      externalId,
-      sessionName: `vibe-generate-${Date.now()}`,
-    });
+    // Return job ID immediately
+    res.json({ jobId });
 
-    // Generate app spec using Bedrock
-    console.log(`[API] Generating spec for: ${appName}`);
-    const spec = await generateAppSpec(prompt, blueprint, credentials);
+    // Start async generation process
+    (async () => {
+      try {
+        statusTracker.addUpdate(jobId, 'validate', 'Validating request and preparing AWS credentials', false);
 
-    // Generate app ID
-    const appId = uuidv4();
+        // Sanitize app name for CloudFormation (no spaces, special chars)
+        const sanitizedAppName = appName
+          .replace(/[^a-zA-Z0-9-]/g, '-')  // Replace invalid chars with hyphen
+          .replace(/-+/g, '-')              // Remove consecutive hyphens
+          .replace(/^-|-$/g, '');           // Remove leading/trailing hyphens
 
-    // Render repository with sanitized app name
-    console.log(`[API] Rendering repository for: ${appName}`);
-    await renderRepo(appId, spec, accountId, region, sanitizedAppName);
+        // Get tenant config for external ID
+        const { externalId } = await getTenantConfig();
+        const roleName = process.env.ROLE_NAME || 'VibeDeployerRole';
 
-    // Deploy dev stack
-    console.log(`[API] Deploying dev stack for: ${sanitizedAppName}`);
-    const deployment = await deployCdkStack(
-      appId,
-      sanitizedAppName,
-      accountId,
-      region,
-      Environment.DEV,
-      externalId
-    );
+        statusTracker.addUpdate(jobId, 'validate', 'AWS credentials validated', true);
+        statusTracker.addUpdate(jobId, 'assume-role', 'Assuming AWS role for deployment', false);
 
-    if (deployment.status === 'failed') {
-      throw new Error(deployment.error || 'Deployment failed');
-    }
+        // Assume role
+        const credentials = await assumeRole({
+          accountId,
+          region,
+          roleName,
+          externalId,
+          sessionName: `vibe-generate-${Date.now()}`,
+        });
 
-    // Update manifest
-    const manifestPath = path.join(WORK_DIR, appId, '.vibe', 'manifest.json');
-    const manifest: AppManifest = await readJson(manifestPath);
-    manifest.deployments.dev = deployment;
-    manifest.updatedAt = new Date().toISOString();
-    await writeJson(manifestPath, manifest);
+        statusTracker.addUpdate(jobId, 'assume-role', 'AWS role assumed successfully', true);
+        statusTracker.addUpdate(jobId, 'bedrock-spec', 'Calling Amazon Bedrock to generate app specification', false);
 
-    const response: GenerateResponse = {
-      appId,
-      spec,
-      previewUrl: deployment.previewUrl || '',
-      stackName: deployment.stackName,
-      outputs: deployment.outputs,
-    };
+        // Generate app spec using Bedrock
+        console.log(`[API] Generating spec for: ${appName}`);
+        const spec = await generateAppSpec(prompt, blueprint, credentials, (step, message) => {
+          statusTracker.addUpdate(jobId, step, message, false);
+        });
 
-    res.json(response);
+        statusTracker.addUpdate(jobId, 'bedrock-spec', 'App specification generated', true);
+
+        // Generate app ID
+        const appId = uuidv4();
+
+        statusTracker.addUpdate(jobId, 'scaffold', 'Writing generated code and infrastructure files', false);
+
+        // Render repository with sanitized app name
+        console.log(`[API] Rendering repository for: ${appName}`);
+        await renderRepo(appId, spec, accountId, region, sanitizedAppName);
+
+        statusTracker.addUpdate(jobId, 'scaffold', 'Repository scaffolded successfully', true);
+        statusTracker.addUpdate(jobId, 'deploy', 'Deploying infrastructure to AWS (this may take 3-5 minutes)', false);
+
+        // Deploy dev stack
+        console.log(`[API] Deploying dev stack for: ${sanitizedAppName}`);
+        const deployment = await deployCdkStack(
+          appId,
+          sanitizedAppName,
+          accountId,
+          region,
+          Environment.DEV,
+          externalId,
+          (step, message) => {
+            statusTracker.addUpdate(jobId, step, message, false);
+          }
+        );
+
+        if (deployment.status === 'failed') {
+          throw new Error(deployment.error || 'Deployment failed');
+        }
+
+        statusTracker.addUpdate(jobId, 'deploy', 'Infrastructure deployed successfully', true);
+        statusTracker.addUpdate(jobId, 'finalize', 'Finalizing deployment', false);
+
+        // Update manifest
+        const manifestPath = path.join(WORK_DIR, appId, '.vibe', 'manifest.json');
+        const manifest: AppManifest = await readJson(manifestPath);
+        manifest.deployments.dev = deployment;
+        manifest.updatedAt = new Date().toISOString();
+        await writeJson(manifestPath, manifest);
+
+        const response: GenerateResponse = {
+          appId,
+          spec,
+          previewUrl: deployment.previewUrl || '',
+          stackName: deployment.stackName,
+          outputs: deployment.outputs,
+        };
+
+        statusTracker.addUpdate(jobId, 'finalize', 'Deployment complete!', true);
+        statusTracker.completeJob(jobId, response);
+        statusTracker.cleanup(jobId);
+      } catch (error: any) {
+        console.error('[API] Generate error:', error);
+        const errorMessage = error.name === 'BedrockAccessError'
+          ? `Bedrock access denied: ${error.message}`
+          : error.message;
+        statusTracker.failJob(jobId, errorMessage);
+        statusTracker.cleanup(jobId);
+      }
+    })();
   } catch (error: any) {
-    console.error('[API] Generate error:', error);
-    res.status(500).json({
-      error: 'Generation failed',
+    console.error('[API] Generate validation error:', error);
+    res.status(400).json({
+      error: 'Validation failed',
       message: error.message,
-      details: error.name === 'BedrockAccessError' ? {
-        type: 'bedrock_access',
-        region: process.env.BEDROCK_REGION,
-        modelId: process.env.BEDROCK_MODEL_ID,
-      } : undefined,
     });
   }
 });

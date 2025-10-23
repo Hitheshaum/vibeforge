@@ -23,6 +23,7 @@ export default function Home() {
   const [previewUrl, setPreviewUrl] = useState('');
   const [currentAppId, setCurrentAppId] = useState('');
   const [bedrockError, setBedrockError] = useState('');
+  const [generationStatus, setGenerationStatus] = useState<any[]>([]);
 
   // Publish
   const [publishing, setPublishing] = useState(false);
@@ -53,18 +54,52 @@ export default function Home() {
       setGenerateError('');
       setBedrockError('');
       setPreviewUrl('');
+      setGenerationStatus([]);
 
-      const result = await api.generate(accountId, region, blueprint, prompt, appName);
-      setCurrentAppId(result.appId);
-      setPreviewUrl(result.previewUrl);
-      await loadApps();
+      // Start generation and get job ID
+      const { jobId } = await api.generate(accountId, region, blueprint, prompt, appName);
+
+      // Poll for status updates
+      const pollInterval = setInterval(async () => {
+        try {
+          const status = await api.getGenerateStatus(jobId);
+
+          // Update status display
+          setGenerationStatus(status.updates || []);
+
+          // Check if job is complete
+          if (status.status === 'completed') {
+            clearInterval(pollInterval);
+            setGenerating(false);
+            setCurrentAppId(status.result.appId);
+            setPreviewUrl(status.result.previewUrl);
+            await loadApps();
+          } else if (status.status === 'failed') {
+            clearInterval(pollInterval);
+            setGenerating(false);
+            setGenerateError(status.error || 'Generation failed');
+
+            // Check for Bedrock access error
+            if (status.error?.includes('Bedrock') || status.error?.includes('bedrock')) {
+              setBedrockError(status.error);
+            }
+          }
+        } catch (error: any) {
+          console.error('Status polling error:', error);
+          // Don't clear interval on transient errors, keep polling
+        }
+      }, 2000); // Poll every 2 seconds
+
+      // Cleanup interval after 30 minutes to prevent infinite polling
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        if (generating) {
+          setGenerating(false);
+          setGenerateError('Generation timeout - please check your AWS console');
+        }
+      }, 1800000);
     } catch (error: any) {
       setGenerateError(error.message);
-      // Check for Bedrock access error
-      if (error.message.includes('Model access') || error.message.includes('bedrock')) {
-        setBedrockError(error.message);
-      }
-    } finally {
       setGenerating(false);
     }
   };
@@ -212,16 +247,33 @@ export default function Home() {
             <div className="status" style={{ marginTop: '1rem', padding: '1rem', background: '#f0f9ff', border: '1px solid #0ea5e9', borderRadius: '4px' }}>
               <div style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>⏳ Deploying your app...</div>
               <div style={{ fontSize: '0.9rem', color: '#666' }}>
-                This may take 3-7 minutes:
-                <ul style={{ marginTop: '0.5rem', marginBottom: 0 }}>
-                  <li>Generating app specification with Bedrock</li>
-                  <li>Scaffolding project files</li>
-                  <li>Installing infrastructure dependencies</li>
-                  <li>Installing and building web app</li>
-                  <li>Bootstrapping CDK (first time only)</li>
-                  <li>Deploying infrastructure to AWS</li>
-                  <li>Uploading web assets to S3</li>
-                </ul>
+                {generationStatus.length === 0 ? (
+                  <div>Starting generation...</div>
+                ) : (
+                  <div style={{ marginTop: '0.5rem' }}>
+                    {generationStatus.map((update, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          marginBottom: '0.5rem',
+                          paddingLeft: '1rem',
+                          borderLeft: update.completed ? '3px solid #10b981' : '3px solid #0ea5e9',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          {update.completed ? (
+                            <span style={{ color: '#10b981' }}>✓</span>
+                          ) : (
+                            <span style={{ color: '#0ea5e9' }}>⏳</span>
+                          )}
+                          <span style={{ fontWeight: update.completed ? 'normal' : 'bold' }}>
+                            {update.message}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

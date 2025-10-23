@@ -35,6 +35,7 @@ export async function generateSpec(
     // Detect model type and format request accordingly
     const isClaudeModel = BEDROCK_MODEL_ID.includes('anthropic');
     const isTitanModel = BEDROCK_MODEL_ID.includes('amazon.titan');
+    const isQwenModel = BEDROCK_MODEL_ID.includes('qwen');
 
     let requestBody: any;
 
@@ -62,6 +63,23 @@ export async function generateSpec(
           topP: 0.9,
         },
       };
+    } else if (isQwenModel) {
+      // Qwen API format - uses OpenAI Chat Completions format
+      requestBody = {
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          {
+            role: 'user',
+            content: userPrompt,
+          },
+        ],
+        max_tokens: 4096,
+        temperature: 0.7,
+        top_p: 0.9,
+      };
     } else {
       throw new Error(`Unsupported model: ${BEDROCK_MODEL_ID}`);
     }
@@ -84,6 +102,9 @@ export async function generateSpec(
       content = responseBody.content[0].text;
     } else if (isTitanModel) {
       content = responseBody.results[0].outputText;
+    } else if (isQwenModel) {
+      // Qwen uses OpenAI Chat Completions response format
+      content = responseBody.choices[0].message.content;
     } else {
       throw new Error('Unable to parse response');
     }
@@ -283,6 +304,7 @@ export async function testBedrockAccess(
 
     const isClaudeModel = BEDROCK_MODEL_ID.includes('anthropic');
     const isTitanModel = BEDROCK_MODEL_ID.includes('amazon.titan');
+    const isQwenModel = BEDROCK_MODEL_ID.includes('qwen');
 
     let requestBody: any;
 
@@ -304,6 +326,19 @@ export async function testBedrockAccess(
           maxTokenCount: 10,
           temperature: 0.7,
         },
+      };
+    } else if (isQwenModel) {
+      // Qwen uses OpenAI Chat Completions format
+      requestBody = {
+        messages: [
+          {
+            role: 'user',
+            content: 'Hello',
+          },
+        ],
+        max_tokens: 10,
+        temperature: 0.7,
+        top_p: 0.9,
       };
     } else {
       return { ok: false, error: `Unsupported model: ${BEDROCK_MODEL_ID}` };
@@ -361,6 +396,7 @@ export async function generateComponentCode(
   try {
     const isClaudeModel = BEDROCK_MODEL_ID.includes('anthropic');
     const isTitanModel = BEDROCK_MODEL_ID.includes('amazon.titan');
+    const isQwenModel = BEDROCK_MODEL_ID.includes('qwen');
 
     let requestBody: any;
 
@@ -381,6 +417,23 @@ export async function generateComponentCode(
           topP: 0.9,
         },
       };
+    } else if (isQwenModel) {
+      // Qwen API format - uses OpenAI Chat Completions format
+      requestBody = {
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          {
+            role: 'user',
+            content: userPrompt,
+          },
+        ],
+        max_tokens: 8000,
+        temperature: 0.3,
+        top_p: 0.9,
+      };
     } else {
       throw new Error(`Unsupported model: ${BEDROCK_MODEL_ID}`);
     }
@@ -400,6 +453,9 @@ export async function generateComponentCode(
       content = responseBody.content[0].text;
     } else if (isTitanModel) {
       content = responseBody.results[0].outputText;
+    } else if (isQwenModel) {
+      // Qwen uses OpenAI Chat Completions response format
+      content = responseBody.choices[0].message.content;
     } else {
       throw new Error('Unable to parse response');
     }
@@ -426,22 +482,27 @@ Output ONLY valid JSON in this exact format:
     "TodoList": "import React from 'react';\\n\\nexport function TodoList() {\\n  return <div>Todo List</div>;\\n}"
   },
   "lib": {
-    "api": "export const apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api';"
+    "api": "const baseUrl = (process.env.NEXT_PUBLIC_API_URL || '/api').replace(/\\\\/+$/, '');\\\\nexport async function getTodos() { const res = await fetch(\\`\\${baseUrl}/todos\\`); return res.json(); }",
+    "types": "export interface Todo { id: string; title: string; }"
   }
 }
 
-Requirements:
+CRITICAL Requirements:
 1. All code must be valid TypeScript with proper types
-2. Use React hooks (useState, useEffect, etc.)
-3. Include API calls using fetch() with error handling
-4. Add proper loading and error states
-5. Use inline styles with Tailwind-like utility classes
-6. Make components interactive and functional
-7. Include form validation where appropriate
-8. Escape all special characters in JSON strings (\\n for newlines, \\" for quotes, etc.)
-9. Output ONLY the JSON object, no markdown, no explanations
-10. Pages should be Next.js page components (default export)
-11. Components should be named exports`;
+2. ALWAYS define TypeScript types/interfaces in lib/types.ts and import them where needed
+3. NEVER import types from components - define all shared types in lib/types.ts
+4. Each component file must be self-contained with all necessary exports
+5. Use React hooks (useState, useEffect, etc.)
+6. Include API calls using fetch() with error handling
+7. Add proper loading and error states
+8. Use inline styles with Tailwind-like utility classes
+9. Make components interactive and functional
+10. Include form validation where appropriate
+11. Escape all special characters in JSON strings (\\n for newlines, \\" for quotes, etc.)
+12. Output ONLY the JSON object, no markdown, no explanations
+13. Pages should be Next.js page components (default export)
+14. Components should be named exports
+15. lib/api.ts should import types from lib/types.ts, NOT from components`;
 }
 
 function buildComponentUserPrompt(spec: AppSpec): string {
@@ -459,23 +520,35 @@ ${spec.api.map(e => `- ${e.method} ${e.path}: ${e.description || ''}`).join('\n'
 ${spec.dataModel.map(m => `- ${m.table}: ${m.attributes.map(a => `${a.name} (${a.type})`).join(', ')}`).join('\n')}
 
 Generate:
-1. **pages**: Create a functional Next.js page component for each route that:
-   - Fetches data from the API
-   - Displays loading states
-   - Handles errors gracefully
-   - Uses the specified components
-   - Has a clean, modern UI with inline styles
+1. **lib/types.ts**: FIRST, create a types file that exports ALL TypeScript interfaces for:
+   - Data models (based on the data model above)
+   - API request/response types
+   - Component props
+   - Any other shared types
 
-2. **components**: Create reusable components that:
+2. **lib/api.ts**: Create an API utility file that:
+   - Imports types from './types'
+   - CRITICAL: Strip trailing slashes from base URL: const baseUrl = (process.env.NEXT_PUBLIC_API_URL || '/api').replace(/\/+$/, '');
+   - Exports helper functions for each API endpoint
+   - Construct URLs properly without double slashes: \`\${baseUrl}/path\` NOT \`\${baseUrl}\${path}\`
+   - Handles fetch requests with proper error handling
+   - Returns properly typed data
+
+3. **components**: Create reusable components that:
+   - Import types from '../lib/types'
    - Handle CRUD operations via API calls
    - Include forms with validation
    - Show lists with proper formatting
-   - Are fully interactive
+   - Are fully interactive and self-contained
 
-3. **lib**: Create an API utility file that:
-   - Exports helper functions for each API endpoint
-   - Handles fetch requests with proper error handling
-   - Uses TypeScript types
+4. **pages**: Create a functional Next.js page component for each route that:
+   - Imports components and types
+   - Fetches data from the API
+   - Displays loading states
+   - Handles errors gracefully
+   - Has a clean, modern UI with inline styles
+
+IMPORTANT: All TypeScript types MUST be defined in lib/types.ts and imported from there. Never define types inline or in component files.
 
 Make the app beautiful and functional with modern inline styles. Use responsive design principles.`;
 }

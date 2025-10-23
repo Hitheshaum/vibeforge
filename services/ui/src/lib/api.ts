@@ -51,11 +51,15 @@ export const api = {
     blueprint: Blueprint,
     prompt: string,
     appName: string
-  ): Promise<GenerateResponse> {
+  ): Promise<{ jobId: string }> {
     return fetchApi('/api/generate', {
       method: 'POST',
       body: JSON.stringify({ accountId, region, blueprint, prompt, appName }),
     });
+  },
+
+  async getGenerateStatus(jobId: string): Promise<any> {
+    return fetchApi(`/api/generate/${jobId}/status`);
   },
 
   async publish(
