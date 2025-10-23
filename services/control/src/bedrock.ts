@@ -533,7 +533,7 @@ Generate:
    - Fallback to process.env.NEXT_PUBLIC_API_URL if config.json fails
    - Strip trailing slashes from base URL: baseUrl.replace(/\/+$/, '')
    - Exports helper functions for each API endpoint
-   - Construct URLs properly without double slashes: \`\${baseUrl}/path\` NOT \`\${baseUrl}\${path}\`
+   - Construct URLs properly without double slashes
    - Handles fetch requests with proper error handling
    - Returns properly typed data
 
