@@ -506,30 +506,34 @@ CRITICAL Requirements:
 }
 
 function buildComponentUserPrompt(spec: AppSpec): string {
-  const pages = spec.pages.map(p => `- ${p.route}: ${p.title || 'Page'} (components: ${p.components.join(', ')})`).join('\n');
-  const endpoints = spec.api.map(e => `- ${e.method} ${e.path}: ${e.description || ''}`).join('\n');
-  const models = spec.dataModel.map(m => `- ${m.table}: ${m.attributes.map(a => `${a.name} (${a.type})`).join(', ')}`).join('\n');
+  const pages = spec.pages.map(p => '- ' + p.route + ': ' + (p.title || 'Page') + ' (components: ' + p.components.join(', ') + ')').join('\n');
+  const endpoints = spec.api.map(e => '- ' + e.method + ' ' + e.path + ': ' + (e.description || '')).join('\n');
+  const models = spec.dataModel.map(m => '- ' + m.table + ': ' + m.attributes.map(a => a.name + ' (' + a.type + ')').join(', ')).join('\n');
 
-  return `Generate fully functional React components for this application:
+  const prompt = [
+    'Generate fully functional React components for this application:',
+    '',
+    '**App Name:** ' + spec.name,
+    '',
+    '**Pages:**',
+    pages,
+    '',
+    '**API Endpoints:**',
+    endpoints,
+    '',
+    '**Data Model:**',
+    models,
+    '',
+    'Generate:',
+    '1. lib/types.ts - TypeScript interfaces for data models, API types, and component props',
+    '2. lib/api.ts - API utility that loads config from /config.json at runtime and provides typed helper functions',
+    '3. components - Reusable React components with forms, lists, and full interactivity',
+    '4. pages - Next.js page components that fetch data and display it with loading and error states',
+    '',
+    'CRITICAL: Define ALL TypeScript types in lib/types.ts and import them. Load API URL from /config.json at runtime, not from environment variables.',
+    '',
+    'Make the app beautiful with modern inline styles and responsive design.'
+  ].join('\n');
 
-**App Name:** ${spec.name}
-
-**Pages:**
-${pages}
-
-**API Endpoints:**
-${endpoints}
-
-**Data Model:**
-${models}
-
-Generate:
-1. lib/types.ts - TypeScript interfaces for data models, API types, and component props
-2. lib/api.ts - API utility that loads config from /config.json at runtime and provides typed helper functions
-3. components - Reusable React components with forms, lists, and full interactivity
-4. pages - Next.js page components that fetch data and display it with loading and error states
-
-CRITICAL: Define ALL TypeScript types in lib/types.ts and import them. Load API URL from /config.json at runtime, not from environment variables.
-
-Make the app beautiful with modern inline styles and responsive design.`;
+  return prompt;
 }
