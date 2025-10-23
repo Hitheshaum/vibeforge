@@ -531,7 +531,7 @@ Generate:
    - CRITICAL: Load API URL from runtime config, NOT environment variables
    - First, try to fetch /config.json to get runtime API URL
    - Fallback to process.env.NEXT_PUBLIC_API_URL if config.json fails
-   - Strip trailing slashes from base URL: baseUrl.replace(/\/+$/, '')
+   - Strip trailing slashes from base URL using regex replace
    - Exports helper functions for each API endpoint
    - Construct URLs properly without double slashes
    - Handles fetch requests with proper error handling
